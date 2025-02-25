@@ -1,0 +1,31 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main  # Uruchamia się tylko przy pushu do maina
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 13.49.44.152 >> ~/.ssh/known_hosts
+
+      - name: Deploy code to server
+        run: |
+          ssh ubuntu@13.49.44.152 << 'EOF'
+            cd ~/tom_base
+            git pull origin main
+            source venv/bin/activate
+            poetry install
+            sudo systemctl restart gunicorn
+          EOF
