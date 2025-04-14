@@ -525,7 +525,25 @@ class TargetHermesPreloadView(SingleObjectMixin, View):
         else:
             return HttpResponseBadRequest("Must have hermes section with HERMES_API_KEY set in DATA_SHARING settings")
 
+def convert_ra(value):
+    """
+    Konwertuje wartość RA podaną w formacie hh:mm:ss na liczbę w stopniach.
+    Jeśli wartość jest już liczbą, zwraca float.
+    """
+    if ':' in value:
+        try:
+            parts = value.split(':')
+            if len(parts) != 3:
+                raise ValueError("Niepoprawny format RA, oczekiwano hh:mm:ss")
+            hours, minutes, seconds = map(float, parts)
+            return hours * 15 + minutes * 15/60 + seconds * 15/3600
+        except Exception as e:
+            raise ValueError(f"Błąd konwersji RA '{value}': {e}")
+    else:
+        return float(value)
 
+
+import pandas as pd
 class TargetImportView(LoginRequiredMixin, TemplateView):
     """
     View that handles the import of targets from a CSV. Requires authentication.
@@ -539,15 +557,48 @@ class TargetImportView(LoginRequiredMixin, TemplateView):
         :param request: the request object passed to this view
         :type request: HTTPRequest
         """
-        csv_file = request.FILES['target_csv']
-        csv_stream = StringIO(csv_file.read().decode('utf-8'), newline=None)
-        result = import_targets(csv_stream)
+        uploaded_file = request.FILES['target_csv']
+        file_content = uploaded_file.read().decode('utf-8')
+
+        if uploaded_file.name.endswith('.csv'):
+            file_stream = StringIO(file_content, newline=None)
+            print(file_stream.getvalue())
+
+            result = import_targets(file_stream)
+        elif uploaded_file.name.endswith('.txt'):
+            print('Processing .txt file')
+            lines = file_content.splitlines()
+            header = lines[0].strip().split()
+            
+            # Deleting second line if it contains only dashes or spaces
+            if all(char in "- " for char in lines[1].strip()):
+                data_lines = lines[2:]
+            else:
+                data_lines = lines[1:]
+            
+            rows = [line.strip().split() for line in data_lines if line.strip()]
+            print("Header:", header)
+            print("Pierwsze kilka wierszy danych:", rows[:5])
+            
+            df = pd.DataFrame(rows, columns=header)
+            df['type'] = 'SIDEREAL'
+            if "object" in df.columns:
+                df.rename(columns={"object": "name"}, inplace=True)
+            
+            # Convert DataFrame to CSV string – dzięki temu funkcja import_targets() może działać bez zmian
+            csv_buffer = StringIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_buffer.seek(0)
+            result = import_targets(csv_buffer)
+
+
+        else:
+            messages.error(request, "Unsupported file type. Please upload a .csv or .txt file.")
+            return redirect(reverse('tom_targets:import'))
+
         for target in result['targets']:
             target.give_user_access(request.user)
-        messages.success(
-            request,
-            'Targets created: {}'.format(len(result['targets']))
-        )
+        messages.success(request, f'Targets created: {len(result["targets"])}')
         for error in result['errors']:
             messages.warning(request, error)
         return redirect(reverse('tom_targets:list'))

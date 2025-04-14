@@ -56,6 +56,56 @@ def export_targets(qs):
         writer.writerow(target_data)
     return file_buffer
 
+def convert_ra(value):
+    """
+    Konwertuje RA w formacie hh:mm:ss na float (stopnie).
+    """
+    if ':' in value:
+        try:
+            hours_str, minutes_str, seconds_str = value.split(':')
+            hours = float(hours_str)
+            minutes = float(minutes_str)
+            seconds = float(seconds_str)
+            return hours * 15 + minutes * 15/60 + seconds * 15/3600
+        except Exception as e:
+            raise ValueError(f"Błąd konwersji RA '{value}': {e}")
+    else:
+        # zakładamy, że to już jest liczba w stringu
+        return float(value)
+    
+def convert_dec(value):
+    """
+    Konwertuje deklinację z formatu ±dd:mm:ss na liczbę w stopniach (float).
+    Obsługuje np. '+15:36:12.75', '-11:11:52.75', itp.
+    Jeśli nie ma dwukropków, traktuje to jako float w stopniach.
+    """
+    value = value.strip()
+    if ':' in value:
+        sign = 1
+        if value.startswith('-'):
+            sign = -1
+            value = value[1:]
+        elif value.startswith('+'):
+            value = value[1:]
+
+        # Teraz value powinno wyglądać np. '15:36:12.75'
+        parts = value.split(':')
+        if len(parts) != 3:
+            raise ValueError("Niepoprawny format DEC, oczekiwano ±dd:mm:ss")
+
+        degrees = float(parts[0])
+        minutes = float(parts[1])
+        seconds = float(parts[2])
+
+        # Deklinację w formacie dd:mm:ss przeliczamy na °:
+        #  dec(°) = ±( dd + mm/60 + ss/3600 )
+        dec_degrees = sign * (degrees + minutes/60 + seconds/3600)
+        return dec_degrees
+
+    else:
+        # zakładamy, że to już jest liczba, np. '36.459'
+        return float(value)
+
 
 def import_targets(target_stream):
     """
@@ -91,7 +141,29 @@ def import_targets(target_stream):
             elif k not in base_target_fields:
                 target_extra_fields.append((k, row[k]))
             else:
-                target_fields[k] = row[k]
+                # standardowo bierzemy wartość z row
+                value = row[k]
+
+                # Jeśli klucz to 'ra', spróbuj konwertować
+                if k == 'ra':
+                    try:
+                        value = convert_ra(value)
+                    except ValueError as e:
+                        error = f"Error on line {index + 2}: {e}"
+                        errors.append(error)
+                        continue  # pomijamy ten wiersz
+
+                if k == 'dec':
+                    try:
+                        value = convert_dec(value)
+                    except ValueError as e:
+                        error = f"Error on line {index + 2}: {e}"
+                        errors.append(error)
+                        continue
+
+                # przypisz przetworzoną wartość do target_fields
+                target_fields[k] = value
+
         for extra in target_extra_fields:
             row.pop(extra[0])
         try:
