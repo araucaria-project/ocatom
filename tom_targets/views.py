@@ -591,7 +591,6 @@ class TargetImportView(LoginRequiredMixin, TemplateView):
             csv_buffer.seek(0)
             result = import_targets(csv_buffer)
 
-
         else:
             messages.error(request, "Unsupported file type. Please upload a .csv or .txt file.")
             return redirect(reverse('tom_targets:import'))
