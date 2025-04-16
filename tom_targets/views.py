@@ -1,3 +1,4 @@
+import pandas as pd
 import logging
 
 from datetime import datetime
@@ -479,9 +480,9 @@ class TargetDetailView(Raise403PermissionRequiredMixin, DetailView):
             call_command('updatestatus', target_id=target_id, stdout=out)
             messages.info(request, out.getvalue())
             add_hint(request, mark_safe(
-                              'Did you know updating observation statuses can be automated? Learn how in'
-                              '<a href=https://tom-toolkit.readthedocs.io/en/stable/customization/automation.html>'
-                              ' the docs.</a>'))
+                'Did you know updating observation statuses can be automated? Learn how in'
+                '<a href=https://tom-toolkit.readthedocs.io/en/stable/customization/automation.html>'
+                ' the docs.</a>'))
             return redirect(reverse('tom_targets:detail', args=(target_id,)) + '?tab=observations')
 
         obs_template_form = ApplyObservationTemplateForm(request.GET)
@@ -525,6 +526,7 @@ class TargetHermesPreloadView(SingleObjectMixin, View):
         else:
             return HttpResponseBadRequest("Must have hermes section with HERMES_API_KEY set in DATA_SHARING settings")
 
+
 def convert_ra(value):
     """
     Konwertuje wartość RA podaną w formacie hh:mm:ss na liczbę w stopniach.
@@ -543,7 +545,6 @@ def convert_ra(value):
         return float(value)
 
 
-import pandas as pd
 class TargetImportView(LoginRequiredMixin, TemplateView):
     """
     View that handles the import of targets from a CSV. Requires authentication.
@@ -569,28 +570,27 @@ class TargetImportView(LoginRequiredMixin, TemplateView):
             print('Processing .txt file')
             lines = file_content.splitlines()
             header = lines[0].strip().split()
-            
+
             # Deleting second line if it contains only dashes or spaces
             if all(char in "- " for char in lines[1].strip()):
                 data_lines = lines[2:]
             else:
                 data_lines = lines[1:]
-            
+
             rows = [line.strip().split() for line in data_lines if line.strip()]
             print("Header:", header)
             print("Pierwsze kilka wierszy danych:", rows[:5])
-            
+
             df = pd.DataFrame(rows, columns=header)
             df['type'] = 'SIDEREAL'
             if "object" in df.columns:
                 df.rename(columns={"object": "name"}, inplace=True)
-            
+
             # Convert DataFrame to CSV string – dzięki temu funkcja import_targets() może działać bez zmian
             csv_buffer = StringIO()
             df.to_csv(csv_buffer, index=False)
             csv_buffer.seek(0)
             result = import_targets(csv_buffer)
-
 
         else:
             messages.error(request, "Unsupported file type. Please upload a .csv or .txt file.")
@@ -608,6 +608,7 @@ class TargetExportView(TargetListView):
     """
     View that handles the export of targets to a CSV. Only exports selected targets.
     """
+
     def render_to_response(self, context, **response_kwargs):
         """
         Returns a response containing the exported CSV of selected targets.

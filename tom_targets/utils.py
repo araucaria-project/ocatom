@@ -56,6 +56,7 @@ def export_targets(qs):
         writer.writerow(target_data)
     return file_buffer
 
+
 def convert_ra(value):
     """
     Konwertuje RA w formacie hh:mm:ss na float (stopnie).
@@ -72,7 +73,8 @@ def convert_ra(value):
     else:
         # zakładamy, że to już jest liczba w stringu
         return float(value)
-    
+
+
 def convert_dec(value):
     """
     Konwertuje deklinację z formatu ±dd:mm:ss na liczbę w stopniach (float).
@@ -219,10 +221,10 @@ def cone_search_filter(queryset, ra, dec, radius):
     )
 
     separation = ExpressionWrapper(
-            180 * ACos(
-                (Sin(radians(dec)) * Sin(Radians('dec'))) +
-                (Cos(radians(dec)) * Cos(Radians('dec')) * Cos(radians(ra) - Radians('ra')))
-            ) / Pi(), FloatField()
-        )
+        180 * ACos(
+            (Sin(radians(dec)) * Sin(Radians('dec'))) +
+            (Cos(radians(dec)) * Cos(Radians('dec')) * Cos(radians(ra) - Radians('ra')))
+        ) / Pi(), FloatField()
+    )
 
     return queryset.annotate(separation=separation).filter(separation__lte=radius)
